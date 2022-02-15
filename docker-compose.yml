@@ -1,0 +1,88 @@
+volumes:
+  relational-trivia:
+    external: true
+  document-trivia:
+    external: true
+  pgadmin-trivia:
+    external: true
+services:
+  ghi:
+    image: node:lts-bullseye
+    command: /bin/bash run.sh
+    working_dir: /app
+    volumes:
+      - ./ghi:/app
+    ports:
+      - "3000:3000"
+    environment:
+      HOST_OS: ${OS}
+      NODE_ENV: development
+      HOST: "0.0.0.0"
+      REACT_APP_API_HOST: http://localhost:8000
+  api:
+    build:
+      context: api
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./api:/app
+    environment:
+      PGHOST: postgres
+      # See the database, user, and password created in the
+      # initialization scripts
+      PGDATABASE: trivia_game_db
+      PGUSER: trivia_game_user
+      PGPASSWORD: secret
+
+      MONGOHOST: mongo
+      # See the database, user, and password created in the
+      # initialization scripts
+      MONGODATABASE: trivia-game
+      MONGOUSER: trivia-game-user
+      MONGOPASSWORD: secret
+  postgres:
+    image: postgres:14-bullseye
+    volumes:
+      # For your initialization scripts
+      - ./data/postgres/init:/docker-entrypoint-initdb.d
+      # For the data stored by PostgreSQL
+      - relational-trivia:/var/lib/postgresql/data
+    environment:
+      # Password for the postgres superuser
+      # See 01-create-databases.sql for the name/password
+      #   for the user of the application database
+      POSTGRES_PASSWORD: secret
+  pgadmin:
+    image: dpage/pgadmin4
+    volumes:
+      - pgadmin-trivia:/var/lib/pgadmin
+    ports:
+      - 8082:80
+    environment:
+      PGADMIN_DEFAULT_EMAIL: person@example.com
+      PGADMIN_DEFAULT_PASSWORD: password
+      PGADMIN_DISABLE_POSTFIX: 1
+  mongo:
+    image: mongo:5
+    volumes:
+      # For your initialization scripts
+      - ./data/mongo/init:/docker-entrypoint-initdb.d
+      # For the data stored by MongoDB
+      - document-trivia:/data/db
+    environment:
+      # Set for use by Mongo Express
+      MONGO_INITDB_ROOT_USERNAME: root
+      MONGO_INITDB_ROOT_PASSWORD: password
+  mongo-express:
+    image: mongo-express:latest
+    depends_on:
+      - mongo
+    ports:
+      - "8081:8081"
+    environment:
+      # Authentication information from above
+      ME_CONFIG_MONGODB_ADMINUSERNAME: root
+      ME_CONFIG_MONGODB_ADMINPASSWORD: password
+      # URL to MongoDB installation
+      ME_CONFIG_MONGODB_URL: mongodb://root:password@mongo:27017/
